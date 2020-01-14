@@ -1,0 +1,145 @@
+lexis
+
+    EOF                     "\$"
+    MOV_KW                  "MOV"
+    MOVR_KW                 "MOVR"
+    ADD_KW                  "ADD"
+    GOTO_KW                 "GOTO"
+    EQ_KW                   "EQ"
+    SUB_KW                  "SUB"
+    WRT_KW                  "WRT"
+    REG_KW                  "REG"
+    LEFT_SQUARE_BRACKET     "\["
+    RIGHT_SQUARE_BRACKET    "\]"
+    INTEGER                 "0|([1-9][0-9]*)"
+    HEX_VALUE               "0x[0-9,A-F,a-f]{8}"
+    WS                      "\s|\n|\r" [hidden: true]
+
+env
+
+    import "io.github.therealmone.cpuemulator.Config"
+    import "io.github.therealmone.cpuemulator.memory.CommandMemory"
+    import "io.github.therealmone.assembler.command.CommandBuilder"
+
+    code "
+        private int[] cmem = new int[Config.C_MEM_SIZE];
+        private int pc = 0;
+
+        @Override
+        public CommandMemory loadMemory(CharSequence assembler) {
+            parse(assembler);
+            final CommandMemory memory = new CommandMemory();
+            memory.load(cmem);
+            return memory;
+        }
+
+        private int getRegisterNumber(ASTNode register) {
+            return Integer.parseInt(register.getChildren().get(2).asLeaf().getToken().getValue());
+        }
+
+    "
+
+
+syntax
+
+    lang =
+            {command}
+        ,   EOF
+        ;
+
+    command =
+        |   mov_command
+        |   add_command
+        |   goto_command
+        |   eq_command
+        |   sub_command
+        |   wrt_command
+        |   movr_command
+        ;
+
+    mov_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(1);">
+        ,   MOV_KW
+        ,   register -> "builder.destination(getRegisterNumber(node));"
+        ,   HEX_VALUE -> "builder.literal(Integer.decode(token.getValue()));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    add_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(2);">
+        ,   ADD_KW
+        ,   register -> "builder.op1(getRegisterNumber(node));"
+        ,   register -> "builder.op2(getRegisterNumber(node));"
+        ,   register -> "builder.destination(getRegisterNumber(node));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    goto_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(3);">
+        ,   GOTO_KW
+        ,   INTEGER -> "builder.literal(Integer.parseInt(token.getValue()));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    sub_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(4);">
+        ,   SUB_KW
+        ,   register -> "builder.op1(getRegisterNumber(node));"
+        ,   register -> "builder.op2(getRegisterNumber(node));"
+        ,   register -> "builder.destination(getRegisterNumber(node));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    eq_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(5);">
+        ,   EQ_KW
+        ,   register -> "builder.op1(getRegisterNumber(node));"
+        ,   register -> "builder.op2(getRegisterNumber(node));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    wrt_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(6);">
+        ,   WRT_KW
+        ,   register -> "builder.op1(getRegisterNumber(node));"
+        ,   HEX_VALUE -> "builder.literal(Integer.decode(token.getValue()));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    movr_command =
+            <"CommandBuilder builder = CommandBuilder.newInstance().header(7);">
+        ,   MOVR_KW
+        ,   register -> "builder.destination(getRegisterNumber(node));"
+        ,   register -> "builder.op1(getRegisterNumber(node));"
+        ,   <"
+                this.cmem[pc] = builder.build();
+                pc++;
+            ">
+        ;
+
+    register =
+            REG_KW
+        ,   LEFT_SQUARE_BRACKET
+        ,   INTEGER
+        ,   RIGHT_SQUARE_BRACKET
+        ;
+
+$
